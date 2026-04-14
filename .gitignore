@@ -1,0 +1,61 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of go build
+/build/
+bin/
+dist/
+
+# Vendor directory (if not using Go Modules)
+vendor/
+
+# Dependency directories (if using tools like `dep`)
+Gopkg.lock
+Gopkg.toml
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Go module files (optional if you commit them)
+# go.mod
+go.sum
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Environment & config
+.env
+.env.*
+config.yaml
+*.local.*
+
+# Coverage/test
+coverage.*
+*.coverprofile
+
+# Redis/MinIO/temp/test data (optional)
+*.rdb
+*.minio/
+tmp/
+temp/
+
+# Docker
+*.pid
+docker-compose.override.yml

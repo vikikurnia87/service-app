@@ -1,6 +1,6 @@
 //go:build integration
 
-package handler
+package handler_test
 
 import (
 	"log/slog"
@@ -14,21 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"service-app/internal/cache"
+	"service-app/internal/handler"
 	"service-app/internal/repository"
 	"service-app/internal/service"
 	appRedis "service-app/pkg/redis"
 	"service-app/test/integration/testhelper"
 )
 
-// setupIntegrationRoleEcho creates a full Echo stack backed by a real test DB.
-func setupIntegrationRoleEcho(t *testing.T) *echo.Echo {
+// setupIntegrationUserEcho creates a full Echo stack backed by a real test DB.
+func setupIntegrationUserEcho(t *testing.T) *echo.Echo {
 	t.Helper()
 
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
 	logger := slog.Default()
 
@@ -41,24 +39,24 @@ func setupIntegrationRoleEcho(t *testing.T) *echo.Echo {
 		c = cache.NewNoopCache()
 	}
 
-	repo := repository.NewRoleRepository(db)
-	svc := service.NewRoleService(repo, c, logger)
-	h := NewRoleHandler(svc, logger)
+	repo := repository.NewUserRepository(db)
+	svc := service.NewUserService(repo, c, logger)
+	h := handler.NewUserHandler(svc, logger)
 
 	e := echo.New()
-	e.POST("/roles", h.Create)
-	e.GET("/roles", h.GetAll)
-	e.GET("/roles/:id", h.GetByID)
-	e.PUT("/roles/:id", h.Update)
-	e.DELETE("/roles/:id", h.Delete)
+	e.POST("/users", h.Create)
+	e.GET("/users", h.GetAll)
+	e.GET("/users/:id", h.GetByID)
+	e.PUT("/users/:id", h.Update)
+	e.DELETE("/users/:id", h.Delete)
 	return e
 }
 
-func TestRoleHandler_Integration_CreateAndGet(t *testing.T) {
-	e := setupIntegrationRoleEcho(t)
+func TestUserHandler_Integration_CreateAndGet(t *testing.T) {
+	e := setupIntegrationUserEcho(t)
 
-	body := `{"role_name":"IntAdmin","role_desc":"Integration admin","role_code":"INT_ADMIN"}`
-	req := httptest.NewRequest(http.MethodPost, "/roles", strings.NewReader(body))
+	body := `{"name":"Int User","email":"intuser@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
@@ -67,7 +65,7 @@ func TestRoleHandler_Integration_CreateAndGet(t *testing.T) {
 	resp := parseResp(t, rec)
 	assert.True(t, resp.Success)
 
-	req = httptest.NewRequest(http.MethodGet, "/roles", nil)
+	req = httptest.NewRequest(http.MethodGet, "/users", nil)
 	rec = httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 
@@ -76,27 +74,27 @@ func TestRoleHandler_Integration_CreateAndGet(t *testing.T) {
 	assert.True(t, resp.Success)
 }
 
-func TestRoleHandler_Integration_GetByID_NotFound(t *testing.T) {
-	e := setupIntegrationRoleEcho(t)
+func TestUserHandler_Integration_GetByID_NotFound(t *testing.T) {
+	e := setupIntegrationUserEcho(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/roles/99999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/users/99999", nil)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestRoleHandler_Integration_Delete(t *testing.T) {
-	e := setupIntegrationRoleEcho(t)
+func TestUserHandler_Integration_Delete(t *testing.T) {
+	e := setupIntegrationUserEcho(t)
 
-	body := `{"role_name":"DelRole","role_desc":"to delete","role_code":"DEL_ROLE"}`
-	req := httptest.NewRequest(http.MethodPost, "/roles", strings.NewReader(body))
+	body := `{"name":"Del User","email":"deluser@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusCreated, rec.Code)
 
-	req = httptest.NewRequest(http.MethodDelete, "/roles/1", nil)
+	req = httptest.NewRequest(http.MethodDelete, "/users/1", nil)
 	rec = httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 

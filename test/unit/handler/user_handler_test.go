@@ -1,7 +1,6 @@
-package handler
+package handler_test
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,19 +10,18 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"service-app/internal/dto"
-	"service-app/internal/mocks"
+	"service-app/internal/handler"
 	"service-app/internal/structs"
 	"service-app/pkg/apperror"
-	"service-app/pkg/response"
+	appmock "service-app/test/mock"
 )
 
 // setupUserEcho creates a fresh Echo instance with user handler routes.
-func setupUserEcho(t *testing.T, mockSvc *mocks.MockUserService) *echo.Echo {
+func setupUserEcho(t *testing.T, mockSvc *appmock.MockUserService) *echo.Echo {
 	t.Helper()
-	h := NewUserHandler(mockSvc, slog.Default())
+	h := handler.NewUserHandler(mockSvc, slog.Default())
 
 	e := echo.New()
 	e.GET("/users", h.GetAll)
@@ -34,21 +32,12 @@ func setupUserEcho(t *testing.T, mockSvc *mocks.MockUserService) *echo.Echo {
 	return e
 }
 
-// parseResp parses the JSON response body into the response envelope.
-func parseResp(t *testing.T, rec *httptest.ResponseRecorder) response.Response {
-	t.Helper()
-	var resp response.Response
-	err := json.Unmarshal(rec.Body.Bytes(), &resp)
-	require.NoError(t, err, "failed to parse response body")
-	return resp
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /users
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserHandler_GetAll_Success(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	users := []dto.UserResponse{
@@ -73,7 +62,7 @@ func TestUserHandler_GetAll_Success(t *testing.T) {
 }
 
 func TestUserHandler_GetAll_Error(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(nil, apperror.NewInternal(nil))
@@ -93,7 +82,7 @@ func TestUserHandler_GetAll_Error(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserHandler_GetByID_Success(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	user := &dto.UserResponse{ID: 1, Name: "Alice", Email: "alice@example.com"}
@@ -110,7 +99,7 @@ func TestUserHandler_GetByID_Success(t *testing.T) {
 }
 
 func TestUserHandler_GetByID_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/abc", nil)
@@ -124,7 +113,7 @@ func TestUserHandler_GetByID_InvalidID(t *testing.T) {
 }
 
 func TestUserHandler_GetByID_NotFound(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	mockSvc.On("GetByID", mock.Anything, int64(99)).
@@ -143,7 +132,7 @@ func TestUserHandler_GetByID_NotFound(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserHandler_Create_Success(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	createReq := dto.CreateUserRequest{Name: "New", Email: "new@example.com"}
@@ -164,7 +153,7 @@ func TestUserHandler_Create_Success(t *testing.T) {
 }
 
 func TestUserHandler_Create_MissingFields(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	body := `{"name":""}`
@@ -183,7 +172,7 @@ func TestUserHandler_Create_MissingFields(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserHandler_Update_Success(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	updateReq := dto.UpdateUserRequest{Name: "Updated"}
@@ -203,7 +192,7 @@ func TestUserHandler_Update_Success(t *testing.T) {
 }
 
 func TestUserHandler_Update_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodPut, "/users/abc", strings.NewReader(`{"name":"X"}`))
@@ -219,7 +208,7 @@ func TestUserHandler_Update_InvalidID(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserHandler_Delete_Success(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	mockSvc.On("Delete", mock.Anything, int64(1)).Return(nil)
@@ -235,7 +224,7 @@ func TestUserHandler_Delete_Success(t *testing.T) {
 }
 
 func TestUserHandler_Delete_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockUserService)
+	mockSvc := new(appmock.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodDelete, "/users/abc", nil)

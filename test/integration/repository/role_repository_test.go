@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository
+package repository_test
 
 import (
 	"context"
@@ -10,19 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"service-app/internal/model"
+	"service-app/internal/repository"
 	"service-app/test/integration/testhelper"
 )
 
-// Run with: go test -tags=integration ./internal/repository/...
-
 func TestRoleRepository_Integration_Create(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewRoleRepository(db)
+	repo := repository.NewRoleRepository(db)
 	ctx := context.Background()
 
 	role := &model.Role{RoleName: "Admin", RoleDesc: "Administrator", RoleCode: "ADMIN"}
@@ -31,20 +27,20 @@ func TestRoleRepository_Integration_Create(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, role.ID)
 	assert.Equal(t, "Admin", role.RoleName)
+
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_role", role.ID) })
 }
 
 func TestRoleRepository_Integration_FindByID(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewRoleRepository(db)
+	repo := repository.NewRoleRepository(db)
 	ctx := context.Background()
 
 	role := &model.Role{RoleName: "Editor", RoleDesc: "Content editor", RoleCode: "EDITOR"}
 	require.NoError(t, repo.Create(ctx, role))
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_role", role.ID) })
 
 	found, err := repo.FindByID(ctx, role.ID)
 
@@ -56,16 +52,16 @@ func TestRoleRepository_Integration_FindByID(t *testing.T) {
 
 func TestRoleRepository_Integration_FindAll(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewRoleRepository(db)
+	repo := repository.NewRoleRepository(db)
 	ctx := context.Background()
 
-	require.NoError(t, repo.Create(ctx, &model.Role{RoleName: "A", RoleDesc: "a", RoleCode: "A"}))
-	require.NoError(t, repo.Create(ctx, &model.Role{RoleName: "B", RoleDesc: "b", RoleCode: "B"}))
+	r1 := &model.Role{RoleName: "A", RoleDesc: "a", RoleCode: "A"}
+	r2 := &model.Role{RoleName: "B", RoleDesc: "b", RoleCode: "B"}
+	require.NoError(t, repo.Create(ctx, r1))
+	require.NoError(t, repo.Create(ctx, r2))
+	t.Cleanup(func() { testhelper.DeleteByIDs(t, db, "t_role", r1.ID, r2.ID) })
 
 	roles, err := repo.FindAll(ctx)
 
@@ -75,16 +71,14 @@ func TestRoleRepository_Integration_FindAll(t *testing.T) {
 
 func TestRoleRepository_Integration_Update(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewRoleRepository(db)
+	repo := repository.NewRoleRepository(db)
 	ctx := context.Background()
 
 	role := &model.Role{RoleName: "Original", RoleDesc: "orig", RoleCode: "ORIG"}
 	require.NoError(t, repo.Create(ctx, role))
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_role", role.ID) })
 
 	role.RoleName = "Updated"
 	require.NoError(t, repo.Update(ctx, role))
@@ -96,12 +90,9 @@ func TestRoleRepository_Integration_Update(t *testing.T) {
 
 func TestRoleRepository_Integration_Delete(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_role")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewRoleRepository(db)
+	repo := repository.NewRoleRepository(db)
 	ctx := context.Background()
 
 	role := &model.Role{RoleName: "ToDelete", RoleDesc: "del", RoleCode: "DEL"}

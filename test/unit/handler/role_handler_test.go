@@ -1,4 +1,4 @@
-package handler
+package handler_test
 
 import (
 	"log/slog"
@@ -12,15 +12,16 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"service-app/internal/dto"
-	"service-app/internal/mocks"
+	"service-app/internal/handler"
 	"service-app/internal/structs"
 	"service-app/pkg/apperror"
+	appmock "service-app/test/mock"
 )
 
 // setupRoleEcho creates a fresh Echo instance with role handler routes.
-func setupRoleEcho(t *testing.T, mockSvc *mocks.MockRoleService) *echo.Echo {
+func setupRoleEcho(t *testing.T, mockSvc *appmock.MockRoleService) *echo.Echo {
 	t.Helper()
-	h := NewRoleHandler(mockSvc, slog.Default())
+	h := handler.NewRoleHandler(mockSvc, slog.Default())
 
 	e := echo.New()
 	e.GET("/roles", h.GetAll)
@@ -36,7 +37,7 @@ func setupRoleEcho(t *testing.T, mockSvc *mocks.MockRoleService) *echo.Echo {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleHandler_GetAll_Success(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	roles := []dto.RoleResponse{
@@ -61,7 +62,7 @@ func TestRoleHandler_GetAll_Success(t *testing.T) {
 }
 
 func TestRoleHandler_GetAll_Error(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(nil, apperror.NewInternal(nil))
@@ -79,7 +80,7 @@ func TestRoleHandler_GetAll_Error(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleHandler_GetByID_Success(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	role := &dto.RoleResponse{ID: 1, RoleName: "Admin", RoleCode: "ADMIN", Status: 1}
@@ -96,7 +97,7 @@ func TestRoleHandler_GetByID_Success(t *testing.T) {
 }
 
 func TestRoleHandler_GetByID_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/roles/abc", nil)
@@ -109,7 +110,7 @@ func TestRoleHandler_GetByID_InvalidID(t *testing.T) {
 }
 
 func TestRoleHandler_GetByID_NotFound(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	mockSvc.On("GetByID", mock.Anything, int64(99)).
@@ -128,7 +129,7 @@ func TestRoleHandler_GetByID_NotFound(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleHandler_Create_Success(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	createReq := dto.CreateRoleRequest{RoleName: "Editor", RoleDesc: "Content editor", RoleCode: "EDITOR"}
@@ -149,7 +150,7 @@ func TestRoleHandler_Create_Success(t *testing.T) {
 }
 
 func TestRoleHandler_Create_MissingFields(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	body := `{"role_name":"","role_code":""}`
@@ -168,7 +169,7 @@ func TestRoleHandler_Create_MissingFields(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleHandler_Update_Success(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	updateReq := dto.UpdateRoleRequest{RoleName: "Updated"}
@@ -188,7 +189,7 @@ func TestRoleHandler_Update_Success(t *testing.T) {
 }
 
 func TestRoleHandler_Update_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodPut, "/roles/abc", strings.NewReader(`{}`))
@@ -204,7 +205,7 @@ func TestRoleHandler_Update_InvalidID(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleHandler_Delete_Success(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	mockSvc.On("Delete", mock.Anything, int64(1)).Return(nil)
@@ -220,7 +221,7 @@ func TestRoleHandler_Delete_Success(t *testing.T) {
 }
 
 func TestRoleHandler_Delete_InvalidID(t *testing.T) {
-	mockSvc := new(mocks.MockRoleService)
+	mockSvc := new(appmock.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
 	req := httptest.NewRequest(http.MethodDelete, "/roles/abc", nil)

@@ -1,6 +1,6 @@
 //go:build integration
 
-package repository
+package repository_test
 
 import (
 	"context"
@@ -10,19 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"service-app/internal/model"
+	"service-app/internal/repository"
 	"service-app/test/integration/testhelper"
 )
 
-// Run with: go test -tags=integration ./internal/repository/...
-
 func TestUserRepository_Integration_Create(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_user")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &model.User{Name: "John Doe", Email: "john@example.com"}
@@ -31,20 +27,21 @@ func TestUserRepository_Integration_Create(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, user.ID)
 	assert.Equal(t, "John Doe", user.Name)
+
+	// cleanup: hapus row yang dibuat test
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_user", user.ID) })
 }
 
 func TestUserRepository_Integration_FindByID(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_user")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &model.User{Name: "Jane", Email: "jane@example.com"}
 	require.NoError(t, repo.Create(ctx, user))
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_user", user.ID) })
 
 	found, err := repo.FindByID(ctx, user.ID)
 
@@ -57,7 +54,7 @@ func TestUserRepository_Integration_FindByID_NotFound(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
 	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
 	found, err := repo.FindByID(ctx, 99999)
@@ -68,16 +65,16 @@ func TestUserRepository_Integration_FindByID_NotFound(t *testing.T) {
 
 func TestUserRepository_Integration_FindAll(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_user")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
-	require.NoError(t, repo.Create(ctx, &model.User{Name: "A", Email: "a@example.com"}))
-	require.NoError(t, repo.Create(ctx, &model.User{Name: "B", Email: "b@example.com"}))
+	u1 := &model.User{Name: "A", Email: "a@example.com"}
+	u2 := &model.User{Name: "B", Email: "b@example.com"}
+	require.NoError(t, repo.Create(ctx, u1))
+	require.NoError(t, repo.Create(ctx, u2))
+	t.Cleanup(func() { testhelper.DeleteByIDs(t, db, "t_user", u1.ID, u2.ID) })
 
 	users, err := repo.FindAll(ctx)
 
@@ -87,16 +84,14 @@ func TestUserRepository_Integration_FindAll(t *testing.T) {
 
 func TestUserRepository_Integration_Update(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_user")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &model.User{Name: "Original", Email: "orig@example.com"}
 	require.NoError(t, repo.Create(ctx, user))
+	t.Cleanup(func() { testhelper.DeleteByID(t, db, "t_user", user.ID) })
 
 	user.Name = "Updated"
 	require.NoError(t, repo.Update(ctx, user))
@@ -108,12 +103,9 @@ func TestUserRepository_Integration_Update(t *testing.T) {
 
 func TestUserRepository_Integration_Delete(t *testing.T) {
 	db := testhelper.SetupTestDB(t)
-	t.Cleanup(func() {
-		testhelper.CleanTable(t, db, "t_user")
-		testhelper.TeardownTestDB(t, db)
-	})
+	t.Cleanup(func() { testhelper.TeardownTestDB(t, db) })
 
-	repo := NewUserRepository(db)
+	repo := repository.NewUserRepository(db)
 	ctx := context.Background()
 
 	user := &model.User{Name: "ToDelete", Email: "del@example.com"}

@@ -76,21 +76,23 @@ func TeardownTestDB(t *testing.T, db *bun.DB) {
 	}
 }
 
-// CleanTable truncates the given table, removing all rows and resetting sequences.
-func CleanTable(t *testing.T, db *bun.DB, tableName string) {
+// DeleteByID deletes a specific row by ID from the given table.
+// Safer than TRUNCATE because it only removes the test-created row.
+func DeleteByID(t *testing.T, db *bun.DB, tableName string, id int64) {
 	t.Helper()
 	ctx := context.Background()
-	query := fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", tableName)
-	if _, err := db.ExecContext(ctx, query); err != nil {
-		t.Fatalf("failed to clean table %s: %v", tableName, err)
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", tableName)
+	if _, err := db.ExecContext(ctx, query, id); err != nil {
+		t.Errorf("failed to delete id %d from %s: %v", id, tableName, err)
 	}
 }
 
-// CleanAllTables truncates all test tables.
-func CleanAllTables(t *testing.T, db *bun.DB) {
+// DeleteByIDs deletes multiple rows by IDs from the given table.
+func DeleteByIDs(t *testing.T, db *bun.DB, tableName string, ids ...int64) {
 	t.Helper()
-	CleanTable(t, db, "t_user")
-	CleanTable(t, db, "t_role")
+	for _, id := range ids {
+		DeleteByID(t, db, tableName, id)
+	}
 }
 
 // LoadRedisConfig loads the Redis config from .env for integration tests.

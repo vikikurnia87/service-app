@@ -1,4 +1,4 @@
-package repository
+package repository_test
 
 import (
 	"context"
@@ -9,40 +9,42 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"service-app/internal/model"
+	"service-app/internal/repository"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
 // FindAll
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestRoleRepository_FindAll(t *testing.T) {
+func TestUserRepository_FindAll(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
-	rows := sqlmock.NewRows([]string{"id", "role_name", "role_desc", "role_code", "status"}).
-		AddRow(int64(1), "Admin", "Administrator", "ADMIN", int16(1)).
-		AddRow(int64(2), "User", "Regular user", "USER", int16(1))
+	rows := sqlmock.NewRows([]string{"id", "name", "email"}).
+		AddRow(int64(1), "Alice", "alice@example.com").
+		AddRow(int64(2), "Bob", "bob@example.com")
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-	roles, err := repo.FindAll(context.Background())
+	users, err := repo.FindAll(context.Background())
 
 	require.NoError(t, err)
-	assert.Len(t, roles, 2)
-	assert.Equal(t, "Admin", roles[0].RoleName)
+	assert.Len(t, users, 2)
+	assert.Equal(t, "Alice", users[0].Name)
+	assert.Equal(t, "Bob", users[1].Name)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestRoleRepository_FindAll_Error(t *testing.T) {
+func TestUserRepository_FindAll_Error(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
 	mock.ExpectQuery("SELECT").WillReturnError(assert.AnError)
 
-	roles, err := repo.FindAll(context.Background())
+	users, err := repo.FindAll(context.Background())
 
 	assert.Error(t, err)
-	assert.Nil(t, roles)
+	assert.Nil(t, users)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -50,33 +52,34 @@ func TestRoleRepository_FindAll_Error(t *testing.T) {
 // FindByID
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestRoleRepository_FindByID(t *testing.T) {
+func TestUserRepository_FindByID(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
-	rows := sqlmock.NewRows([]string{"id", "role_name", "role_desc", "role_code", "status"}).
-		AddRow(int64(1), "Admin", "Administrator", "ADMIN", int16(1))
+	rows := sqlmock.NewRows([]string{"id", "name", "email"}).
+		AddRow(int64(1), "Alice", "alice@example.com")
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-	role, err := repo.FindByID(context.Background(), 1)
+	user, err := repo.FindByID(context.Background(), 1)
 
 	require.NoError(t, err)
-	assert.Equal(t, "Admin", role.RoleName)
+	assert.Equal(t, int64(1), user.ID)
+	assert.Equal(t, "Alice", user.Name)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestRoleRepository_FindByID_NotFound(t *testing.T) {
+func TestUserRepository_FindByID_NotFound(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
-	rows := sqlmock.NewRows([]string{"id", "role_name", "role_desc", "role_code", "status"})
+	rows := sqlmock.NewRows([]string{"id", "name", "email"})
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-	role, err := repo.FindByID(context.Background(), 99)
+	user, err := repo.FindByID(context.Background(), 99)
 
 	assert.Error(t, err)
-	assert.Nil(t, role)
+	assert.Nil(t, user)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -84,29 +87,29 @@ func TestRoleRepository_FindByID_NotFound(t *testing.T) {
 // Create
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestRoleRepository_Create(t *testing.T) {
+func TestUserRepository_Create(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
 	mock.ExpectQuery("INSERT").WillReturnRows(
 		sqlmock.NewRows([]string{"id"}).AddRow(int64(1)),
 	)
 
-	role := &model.Role{RoleName: "Admin", RoleDesc: "Administrator", RoleCode: "ADMIN"}
-	err := repo.Create(context.Background(), role)
+	user := &model.User{Name: "New User", Email: "new@example.com"}
+	err := repo.Create(context.Background(), user)
 
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestRoleRepository_Create_Error(t *testing.T) {
+func TestUserRepository_Create_Error(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
 	mock.ExpectQuery("INSERT").WillReturnError(assert.AnError)
 
-	role := &model.Role{RoleName: "Dup", RoleDesc: "Dup", RoleCode: "DUP"}
-	err := repo.Create(context.Background(), role)
+	user := &model.User{Name: "Dup", Email: "dup@example.com"}
+	err := repo.Create(context.Background(), user)
 
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -116,15 +119,15 @@ func TestRoleRepository_Create_Error(t *testing.T) {
 // Update
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestRoleRepository_Update(t *testing.T) {
+func TestUserRepository_Update(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
 	mock.ExpectExec("UPDATE").WillReturnResult(sqlmock.NewResult(0, 1))
 
-	role := &model.Role{RoleName: "Updated", RoleDesc: "Updated desc", RoleCode: "UPD"}
-	role.ID = 1
-	err := repo.Update(context.Background(), role)
+	user := &model.User{Name: "Updated", Email: "updated@example.com"}
+	user.ID = 1
+	err := repo.Update(context.Background(), user)
 
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -134,14 +137,26 @@ func TestRoleRepository_Update(t *testing.T) {
 // Delete
 // ──────────────────────────────────────────────────────────────────────────────
 
-func TestRoleRepository_Delete(t *testing.T) {
+func TestUserRepository_Delete(t *testing.T) {
 	db, mock := newMockDB(t)
-	repo := NewRoleRepository(db)
+	repo := repository.NewUserRepository(db)
 
 	mock.ExpectExec("DELETE").WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := repo.Delete(context.Background(), 1)
 
 	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserRepository_Delete_Error(t *testing.T) {
+	db, mock := newMockDB(t)
+	repo := repository.NewUserRepository(db)
+
+	mock.ExpectExec("DELETE").WillReturnError(assert.AnError)
+
+	err := repo.Delete(context.Background(), 1)
+
+	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

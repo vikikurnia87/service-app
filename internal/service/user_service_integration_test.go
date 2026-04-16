@@ -13,6 +13,7 @@ import (
 	"service-app/internal/cache"
 	"service-app/internal/dto"
 	"service-app/internal/repository"
+	"service-app/internal/structs"
 	appRedis "service-app/pkg/redis"
 	"service-app/test/integration/testhelper"
 )
@@ -67,9 +68,15 @@ func TestUserService_Integration_GetAll(t *testing.T) {
 	_, err = svc.Create(ctx, dto.CreateUserRequest{Name: "B", Email: "b-int@example.com"})
 	require.NoError(t, err)
 
-	result, err := svc.GetAll(ctx)
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.UserDefaultOrders,
+	}
+
+	result, err := svc.GetAll(ctx, params)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(result), 2)
+	data := result.Data.([]dto.UserResponse)
+	assert.GreaterOrEqual(t, len(data), 2)
 }
 
 func TestUserService_Integration_Update(t *testing.T) {

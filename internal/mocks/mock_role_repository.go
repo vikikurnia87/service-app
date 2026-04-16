@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"service-app/internal/model"
+	"service-app/internal/structs"
 )
 
 // MockRoleRepository is a testify mock implementation of repository.RoleRepository.
@@ -19,6 +20,14 @@ func (m *MockRoleRepository) FindAll(ctx context.Context) ([]model.Role, error) 
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]model.Role), args.Error(1)
+}
+
+func (m *MockRoleRepository) FindPaginated(ctx context.Context, params structs.ListParams) ([]model.Role, int, error) {
+	args := m.Called(ctx, params)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]model.Role), args.Int(1), args.Error(2)
 }
 
 func (m *MockRoleRepository) FindByID(ctx context.Context, id int64) (*model.Role, error) {

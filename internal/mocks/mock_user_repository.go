@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"service-app/internal/model"
+	"service-app/internal/structs"
 )
 
 // MockUserRepository is a testify mock implementation of repository.UserRepository.
@@ -19,6 +20,14 @@ func (m *MockUserRepository) FindAll(ctx context.Context) ([]model.User, error) 
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]model.User), args.Error(1)
+}
+
+func (m *MockUserRepository) FindPaginated(ctx context.Context, params structs.ListParams) ([]model.User, int, error) {
+	args := m.Called(ctx, params)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]model.User), args.Int(1), args.Error(2)
 }
 
 func (m *MockUserRepository) FindByID(ctx context.Context, id int64) (*model.User, error) {

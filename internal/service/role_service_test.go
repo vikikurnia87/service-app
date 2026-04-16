@@ -14,6 +14,7 @@ import (
 	"service-app/internal/dto"
 	"service-app/internal/mocks"
 	"service-app/internal/model"
+	"service-app/internal/structs"
 )
 
 // newTestRoleService creates a RoleService with mocked dependencies.
@@ -31,30 +32,46 @@ func newTestRoleService(t *testing.T) (RoleService, *mocks.MockRoleRepository, *
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleService_GetAll_Success(t *testing.T) {
-	svc, mockRepo, _ := newTestRoleService(t)
+	svc, mockRepo, mockCache := newTestRoleService(t)
 	ctx := context.Background()
+
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.RoleDefaultOrders,
+	}
 
 	roles := []model.Role{
 		{ID: 1, RoleName: "Admin", RoleDesc: "Administrator", RoleCode: "ADMIN", Status: 1},
 		{ID: 2, RoleName: "User", RoleDesc: "User", RoleCode: "USER", Status: 1},
 	}
-	mockRepo.On("FindAll", ctx).Return(roles, nil)
 
-	result, err := svc.GetAll(ctx)
+	mockCache.On("Get", ctx, mock.Anything, mock.Anything).Return(errors.New("miss"))
+	mockRepo.On("FindPaginated", ctx, params).Return(roles, 2, nil)
+	mockCache.On("Set", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	result, err := svc.GetAll(ctx, params)
 
 	require.NoError(t, err)
-	assert.Len(t, result, 2)
-	assert.Equal(t, "Admin", result[0].RoleName)
+	data := result.Data.([]dto.RoleResponse)
+	assert.Len(t, data, 2)
+	assert.Equal(t, "Admin", data[0].RoleName)
+	assert.Equal(t, 2, result.Meta.Total)
 	mockRepo.AssertExpectations(t)
 }
 
 func TestRoleService_GetAll_Error(t *testing.T) {
-	svc, mockRepo, _ := newTestRoleService(t)
+	svc, mockRepo, mockCache := newTestRoleService(t)
 	ctx := context.Background()
 
-	mockRepo.On("FindAll", ctx).Return(nil, errors.New("db error"))
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.RoleDefaultOrders,
+	}
 
-	result, err := svc.GetAll(ctx)
+	mockCache.On("Get", ctx, mock.Anything, mock.Anything).Return(errors.New("miss"))
+	mockRepo.On("FindPaginated", ctx, params).Return(nil, 0, errors.New("db error"))
+
+	result, err := svc.GetAll(ctx, params)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -119,7 +136,7 @@ func TestRoleService_GetByID_NotFound(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestRoleService_Create_Success(t *testing.T) {
-	svc, mockRepo, _ := newTestRoleService(t)
+	svc, mockRepo, mockCache := newTestRoleService(t)
 	ctx := context.Background()
 
 	mockRepo.On("Create", ctx, mock.AnythingOfType("*model.Role")).
@@ -128,6 +145,7 @@ func TestRoleService_Create_Success(t *testing.T) {
 			r.ID = 1
 		}).
 		Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, roleListCachePrefix).Return(nil)
 
 	req := dto.CreateRoleRequest{RoleName: "Admin", RoleDesc: "desc", RoleCode: "ADMIN"}
 	result, err := svc.Create(ctx, req)
@@ -162,6 +180,7 @@ func TestRoleService_Update_Success(t *testing.T) {
 	mockRepo.On("FindByID", ctx, int64(1)).Return(existing, nil)
 	mockRepo.On("Update", ctx, mock.AnythingOfType("*model.Role")).Return(nil)
 	mockCache.On("Delete", ctx, "role:1").Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, roleListCachePrefix).Return(nil)
 
 	req := dto.UpdateRoleRequest{RoleName: "New"}
 	result, err := svc.Update(ctx, 1, req)
@@ -195,6 +214,7 @@ func TestRoleService_Delete_Success(t *testing.T) {
 
 	mockRepo.On("Delete", ctx, int64(1)).Return(nil)
 	mockCache.On("Delete", ctx, "role:1").Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, roleListCachePrefix).Return(nil)
 
 	err := svc.Delete(ctx, 1)
 

@@ -1,5 +1,7 @@
 package dto
 
+import "service-app/internal/structs"
+
 // CreateUserRequest is the request body for creating a user.
 type CreateUserRequest struct {
 	Name   string `json:"name" validate:"required"`
@@ -21,4 +23,10 @@ type UserResponse struct {
 	Email  string        `json:"email"`
 	RoleID *int64        `json:"role_id,omitempty"`
 	Role   *RoleResponse `json:"role,omitempty"`
+}
+
+// PaginatedResponse wraps paginated data with metadata.
+type PaginatedResponse struct {
+	Data any          `json:"data"`
+	Meta structs.Meta `json:"meta"`
 }

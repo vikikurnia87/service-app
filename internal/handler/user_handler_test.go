@@ -15,6 +15,7 @@ import (
 
 	"service-app/internal/dto"
 	"service-app/internal/mocks"
+	"service-app/internal/structs"
 	"service-app/pkg/apperror"
 	"service-app/pkg/response"
 )
@@ -54,7 +55,11 @@ func TestUserHandler_GetAll_Success(t *testing.T) {
 		{ID: 1, Name: "Alice", Email: "alice@example.com"},
 		{ID: 2, Name: "Bob", Email: "bob@example.com"},
 	}
-	mockSvc.On("GetAll", mock.Anything).Return(users, nil)
+	paginatedResp := &dto.PaginatedResponse{
+		Data: users,
+		Meta: structs.Meta{Count: 2, Total: 2, TotalPages: 1, PerPage: 15, CurrentPage: 1},
+	}
+	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(paginatedResp, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/users", nil)
 	rec := httptest.NewRecorder()
@@ -71,7 +76,7 @@ func TestUserHandler_GetAll_Error(t *testing.T) {
 	mockSvc := new(mocks.MockUserService)
 	e := setupUserEcho(t, mockSvc)
 
-	mockSvc.On("GetAll", mock.Anything).Return(nil, apperror.NewInternal(nil))
+	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(nil, apperror.NewInternal(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/users", nil)
 	rec := httptest.NewRecorder()

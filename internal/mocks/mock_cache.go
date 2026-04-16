@@ -27,6 +27,11 @@ func (m *MockCache) Delete(ctx context.Context, key string) error {
 	return args.Error(0)
 }
 
+func (m *MockCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	args := m.Called(ctx, prefix)
+	return args.Error(0)
+}
+
 func (m *MockCache) Exists(ctx context.Context, key string) (bool, error) {
 	args := m.Called(ctx, key)
 	return args.Bool(0), args.Error(1)

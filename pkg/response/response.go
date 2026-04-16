@@ -5,14 +5,16 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"service-app/internal/structs"
 	"service-app/pkg/apperror"
 )
 
 // Response is the standard API response envelope.
 type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
+	Success bool          `json:"success"`
+	Message string        `json:"message"`
+	Data    any           `json:"data,omitempty"`
+	Meta    *structs.Meta `json:"meta,omitempty"`
 }
 
 // Success sends a 200 OK response with data.
@@ -21,6 +23,16 @@ func Success(c *echo.Context, message string, data any) error {
 		Success: true,
 		Message: message,
 		Data:    data,
+	})
+}
+
+// SuccessWithMeta sends a 200 OK response with data and pagination metadata.
+func SuccessWithMeta(c *echo.Context, message string, data any, meta *structs.Meta) error {
+	return c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: message,
+		Data:    data,
+		Meta:    meta,
 	})
 }
 

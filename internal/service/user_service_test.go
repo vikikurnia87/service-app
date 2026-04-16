@@ -14,6 +14,7 @@ import (
 	"service-app/internal/dto"
 	"service-app/internal/mocks"
 	"service-app/internal/model"
+	"service-app/internal/structs"
 )
 
 // newTestUserService creates a UserService with mocked dependencies.
@@ -31,8 +32,13 @@ func newTestUserService(t *testing.T) (UserService, *mocks.MockUserRepository, *
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserService_GetAll_Success(t *testing.T) {
-	svc, mockRepo, _ := newTestUserService(t)
+	svc, mockRepo, mockCache := newTestUserService(t)
 	ctx := context.Background()
+
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.UserDefaultOrders,
+	}
 
 	users := []model.User{
 		{Name: "Alice", Email: "alice@example.com"},
@@ -41,24 +47,34 @@ func TestUserService_GetAll_Success(t *testing.T) {
 	users[0].ID = 1
 	users[1].ID = 2
 
-	mockRepo.On("FindAll", ctx).Return(users, nil)
+	mockCache.On("Get", ctx, mock.Anything, mock.Anything).Return(errors.New("miss"))
+	mockRepo.On("FindPaginated", ctx, params).Return(users, 2, nil)
+	mockCache.On("Set", ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	result, err := svc.GetAll(ctx)
+	result, err := svc.GetAll(ctx, params)
 
 	require.NoError(t, err)
-	assert.Len(t, result, 2)
-	assert.Equal(t, "Alice", result[0].Name)
-	assert.Equal(t, "Bob", result[1].Name)
+	data := result.Data.([]dto.UserResponse)
+	assert.Len(t, data, 2)
+	assert.Equal(t, "Alice", data[0].Name)
+	assert.Equal(t, "Bob", data[1].Name)
+	assert.Equal(t, 2, result.Meta.Total)
 	mockRepo.AssertExpectations(t)
 }
 
 func TestUserService_GetAll_Error(t *testing.T) {
-	svc, mockRepo, _ := newTestUserService(t)
+	svc, mockRepo, mockCache := newTestUserService(t)
 	ctx := context.Background()
 
-	mockRepo.On("FindAll", ctx).Return(nil, errors.New("db error"))
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.UserDefaultOrders,
+	}
 
-	result, err := svc.GetAll(ctx)
+	mockCache.On("Get", ctx, mock.Anything, mock.Anything).Return(errors.New("miss"))
+	mockRepo.On("FindPaginated", ctx, params).Return(nil, 0, errors.New("db error"))
+
+	result, err := svc.GetAll(ctx, params)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -128,7 +144,7 @@ func TestUserService_GetByID_NotFound(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestUserService_Create_Success(t *testing.T) {
-	svc, mockRepo, _ := newTestUserService(t)
+	svc, mockRepo, mockCache := newTestUserService(t)
 	ctx := context.Background()
 
 	mockRepo.On("Create", ctx, mock.AnythingOfType("*model.User")).
@@ -137,6 +153,7 @@ func TestUserService_Create_Success(t *testing.T) {
 			u.ID = 1
 		}).
 		Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, userListCachePrefix).Return(nil)
 
 	req := dto.CreateUserRequest{Name: "New", Email: "new@example.com"}
 	result, err := svc.Create(ctx, req)
@@ -173,6 +190,7 @@ func TestUserService_Update_Success(t *testing.T) {
 	mockRepo.On("FindByID", ctx, int64(1)).Return(existing, nil)
 	mockRepo.On("Update", ctx, mock.AnythingOfType("*model.User")).Return(nil)
 	mockCache.On("Delete", ctx, "user:1").Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, userListCachePrefix).Return(nil)
 
 	req := dto.UpdateUserRequest{Name: "New"}
 	result, err := svc.Update(ctx, 1, req)
@@ -207,6 +225,7 @@ func TestUserService_Delete_Success(t *testing.T) {
 
 	mockRepo.On("Delete", ctx, int64(1)).Return(nil)
 	mockCache.On("Delete", ctx, "user:1").Return(nil)
+	mockCache.On("DeleteByPrefix", ctx, userListCachePrefix).Return(nil)
 
 	err := svc.Delete(ctx, 1)
 

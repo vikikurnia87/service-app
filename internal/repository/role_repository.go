@@ -7,11 +7,13 @@ import (
 	"github.com/uptrace/bun"
 
 	"service-app/internal/model"
+	"service-app/internal/structs"
 )
 
 // RoleRepository defines the data-access interface for roles.
 type RoleRepository interface {
 	FindAll(ctx context.Context) ([]model.Role, error)
+	FindPaginated(ctx context.Context, params structs.ListParams) ([]model.Role, int, error)
 	FindByID(ctx context.Context, id int64) (*model.Role, error)
 	Create(ctx context.Context, role *model.Role) error
 	Update(ctx context.Context, role *model.Role) error
@@ -38,6 +40,38 @@ func (r *roleRepository) FindAll(ctx context.Context) ([]model.Role, error) {
 		return nil, fmt.Errorf("repository.Role.FindAll: %w", err)
 	}
 	return roles, nil
+}
+
+func (r *roleRepository) FindPaginated(ctx context.Context, params structs.ListParams) ([]model.Role, int, error) {
+	var roles []model.Role
+	q := r.db.NewSelect().Model(&roles)
+
+	// Search filter: ILIKE on role_name and role_code
+	if params.Search != "" {
+		search := "%" + params.Search + "%"
+		q = q.Where("(tr.role_name ILIKE ? OR tr.role_code ILIKE ?)", search, search)
+	}
+
+	// Count total matching records (before limit/offset)
+	total, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("repository.Role.FindPaginated count: %w", err)
+	}
+
+	// Apply ordering
+	for _, o := range params.Orders {
+		q = q.OrderExpr(fmt.Sprintf("%s %s", bun.Ident(o.Column), o.Direction))
+	}
+
+	// Apply pagination
+	q = q.Limit(params.Pagination.Limit).Offset(params.Pagination.Offset)
+
+	err = q.Scan(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("repository.Role.FindPaginated: %w", err)
+	}
+
+	return roles, total, nil
 }
 
 func (r *roleRepository) FindByID(ctx context.Context, id int64) (*model.Role, error) {

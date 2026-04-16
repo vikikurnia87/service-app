@@ -6,20 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
+	"sort"
+	"strings"
 
 	"service-app/internal/cache"
 	"service-app/internal/dto"
+	"service-app/internal/helpers"
 	"service-app/internal/model"
 	"service-app/internal/repository"
+	"service-app/internal/structs"
 	"service-app/pkg/apperror"
 )
 
-const roleCacheTTL = 10 * time.Minute
+const roleListCachePrefix = "roles:list:"
 
 // RoleService defines the business-logic interface for roles.
 type RoleService interface {
-	GetAll(ctx context.Context) ([]dto.RoleResponse, error)
+	GetAll(ctx context.Context, params structs.ListParams) (*dto.PaginatedResponse, error)
 	GetByID(ctx context.Context, id int64) (*dto.RoleResponse, error)
 	Create(ctx context.Context, req dto.CreateRoleRequest) (*dto.RoleResponse, error)
 	Update(ctx context.Context, id int64, req dto.UpdateRoleRequest) (*dto.RoleResponse, error)
@@ -42,10 +45,19 @@ func NewRoleService(repo repository.RoleRepository, cache cache.Cache, logger *s
 	}
 }
 
-func (s *roleService) GetAll(ctx context.Context) ([]dto.RoleResponse, error) {
-	roles, err := s.repo.FindAll(ctx)
+func (s *roleService) GetAll(ctx context.Context, params structs.ListParams) (*dto.PaginatedResponse, error) {
+	// Build cache key from all query parameters
+	cacheKey := buildRoleListCacheKey(params)
+
+	// Try cache first
+	var cached dto.PaginatedResponse
+	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+		return &cached, nil
+	}
+
+	roles, total, err := s.repo.FindPaginated(ctx, params)
 	if err != nil {
-		s.logger.Error("failed to get all roles", "error", err)
+		s.logger.Error("failed to get paginated roles", "error", err)
 		return nil, apperror.NewInternal(err)
 	}
 
@@ -53,7 +65,20 @@ func (s *roleService) GetAll(ctx context.Context) ([]dto.RoleResponse, error) {
 	for _, r := range roles {
 		result = append(result, toRoleResponse(r))
 	}
-	return result, nil
+
+	meta := helpers.BuildPaginationMeta(len(result), total, params.Pagination.Page, params.Pagination.Limit)
+	resp := dto.PaginatedResponse{
+		Data: result,
+		Meta: meta,
+	}
+
+	// Cache with page-based TTL
+	ttl := helpers.GetPaginationTTL(params.Pagination.Page)
+	if cacheErr := s.cache.Set(ctx, cacheKey, resp, ttl); cacheErr != nil {
+		s.logger.Warn("failed to set role list cache", "key", cacheKey, "error", cacheErr)
+	}
+
+	return &resp, nil
 }
 
 func (s *roleService) GetByID(ctx context.Context, id int64) (*dto.RoleResponse, error) {
@@ -74,7 +99,8 @@ func (s *roleService) GetByID(ctx context.Context, id int64) (*dto.RoleResponse,
 
 	resp := toRoleResponse(*role)
 
-	if cacheErr := s.cache.Set(ctx, cacheKey, resp, roleCacheTTL); cacheErr != nil {
+	ttl := helpers.GetPaginationTTL(1) // same TTL as page 1
+	if cacheErr := s.cache.Set(ctx, cacheKey, resp, ttl); cacheErr != nil {
 		s.logger.Warn("failed to set role cache", "id", id, "error", cacheErr)
 	}
 
@@ -91,6 +117,11 @@ func (s *roleService) Create(ctx context.Context, req dto.CreateRoleRequest) (*d
 	if err := s.repo.Create(ctx, role); err != nil {
 		s.logger.Error("failed to create role", "error", err)
 		return nil, apperror.NewInternal(err)
+	}
+
+	// Invalidate list cache
+	if cacheErr := s.cache.DeleteByPrefix(ctx, roleListCachePrefix); cacheErr != nil {
+		s.logger.Warn("failed to invalidate role list cache after create", "error", cacheErr)
 	}
 
 	resp := toRoleResponse(*role)
@@ -122,8 +153,13 @@ func (s *roleService) Update(ctx context.Context, id int64, req dto.UpdateRoleRe
 		return nil, apperror.NewInternal(err)
 	}
 
+	// Invalidate single entity cache
 	if cacheErr := s.cache.Delete(ctx, roleCacheKey(id)); cacheErr != nil {
 		s.logger.Warn("failed to invalidate role cache", "id", id, "error", cacheErr)
+	}
+	// Invalidate list cache
+	if cacheErr := s.cache.DeleteByPrefix(ctx, roleListCachePrefix); cacheErr != nil {
+		s.logger.Warn("failed to invalidate role list cache after update", "error", cacheErr)
 	}
 
 	resp := toRoleResponse(*role)
@@ -136,8 +172,13 @@ func (s *roleService) Delete(ctx context.Context, id int64) error {
 		return apperror.NewInternal(err)
 	}
 
+	// Invalidate single entity cache
 	if cacheErr := s.cache.Delete(ctx, roleCacheKey(id)); cacheErr != nil {
 		s.logger.Warn("failed to invalidate role cache after delete", "id", id, "error", cacheErr)
+	}
+	// Invalidate list cache
+	if cacheErr := s.cache.DeleteByPrefix(ctx, roleListCachePrefix); cacheErr != nil {
+		s.logger.Warn("failed to invalidate role list cache after delete", "error", cacheErr)
 	}
 
 	return nil
@@ -154,7 +195,25 @@ func toRoleResponse(r model.Role) dto.RoleResponse {
 	}
 }
 
-// roleCacheKey generates the Redis cache key for a role.
+// roleCacheKey generates the Redis cache key for a single role.
 func roleCacheKey(id int64) string {
 	return fmt.Sprintf("role:%d", id)
+}
+
+// buildRoleListCacheKey generates a deterministic cache key from list parameters.
+func buildRoleListCacheKey(params structs.ListParams) string {
+	// Sort orders for deterministic key
+	orderParts := make([]string, 0, len(params.Orders))
+	for _, o := range params.Orders {
+		orderParts = append(orderParts, o.Column+"-"+o.Direction)
+	}
+	sort.Strings(orderParts)
+
+	return fmt.Sprintf("%sp%d:l%d:s:%s:o:%s",
+		roleListCachePrefix,
+		params.Pagination.Page,
+		params.Pagination.Limit,
+		params.Search,
+		strings.Join(orderParts, ","),
+	)
 }

@@ -7,7 +7,9 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"service-app/internal/dto"
+	"service-app/internal/helpers"
 	"service-app/internal/service"
+	"service-app/internal/structs"
 	"service-app/pkg/response"
 )
 
@@ -29,12 +31,22 @@ func NewUserHandler(svc service.UserService, logger *slog.Logger) *UserHandler {
 func (h *UserHandler) GetAll(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	users, err := h.svc.GetAll(ctx)
+	pagination := helpers.GetPaginationParams(c, 15)
+	orders := helpers.ParseOrderParamsWithDefault(c, structs.UserOrderMapping, structs.UserDefaultOrders)
+	search := c.QueryParam("search_like")
+
+	params := structs.ListParams{
+		Pagination: pagination,
+		Orders:     orders,
+		Search:     search,
+	}
+
+	result, err := h.svc.GetAll(ctx, params)
 	if err != nil {
 		return response.Error(c, err)
 	}
 
-	return response.Success(c, "users retrieved successfully", users)
+	return response.SuccessWithMeta(c, "users retrieved successfully", result.Data, &result.Meta)
 }
 
 // GetByID handles GET /users/:id

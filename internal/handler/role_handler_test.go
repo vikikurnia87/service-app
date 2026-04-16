@@ -13,6 +13,7 @@ import (
 
 	"service-app/internal/dto"
 	"service-app/internal/mocks"
+	"service-app/internal/structs"
 	"service-app/pkg/apperror"
 )
 
@@ -42,7 +43,11 @@ func TestRoleHandler_GetAll_Success(t *testing.T) {
 		{ID: 1, RoleName: "Admin", RoleDesc: "Administrator", RoleCode: "ADMIN", Status: 1},
 		{ID: 2, RoleName: "User", RoleDesc: "User", RoleCode: "USER", Status: 1},
 	}
-	mockSvc.On("GetAll", mock.Anything).Return(roles, nil)
+	paginatedResp := &dto.PaginatedResponse{
+		Data: roles,
+		Meta: structs.Meta{Count: 2, Total: 2, TotalPages: 1, PerPage: 15, CurrentPage: 1},
+	}
+	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(paginatedResp, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/roles", nil)
 	rec := httptest.NewRecorder()
@@ -59,7 +64,7 @@ func TestRoleHandler_GetAll_Error(t *testing.T) {
 	mockSvc := new(mocks.MockRoleService)
 	e := setupRoleEcho(t, mockSvc)
 
-	mockSvc.On("GetAll", mock.Anything).Return(nil, apperror.NewInternal(nil))
+	mockSvc.On("GetAll", mock.Anything, mock.Anything).Return(nil, apperror.NewInternal(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/roles", nil)
 	rec := httptest.NewRecorder()

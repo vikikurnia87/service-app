@@ -13,6 +13,7 @@ import (
 	"service-app/internal/cache"
 	"service-app/internal/dto"
 	"service-app/internal/repository"
+	"service-app/internal/structs"
 	appRedis "service-app/pkg/redis"
 	"service-app/test/integration/testhelper"
 )
@@ -67,9 +68,15 @@ func TestRoleService_Integration_GetAll(t *testing.T) {
 	_, err = svc.Create(ctx, dto.CreateRoleRequest{RoleName: "B", RoleDesc: "b", RoleCode: "B_INT"})
 	require.NoError(t, err)
 
-	result, err := svc.GetAll(ctx)
+	params := structs.ListParams{
+		Pagination: structs.Pagination{Page: 1, Limit: 15, Offset: 0},
+		Orders:     structs.RoleDefaultOrders,
+	}
+
+	result, err := svc.GetAll(ctx, params)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(result), 2)
+	data := result.Data.([]dto.RoleResponse)
+	assert.GreaterOrEqual(t, len(data), 2)
 }
 
 func TestRoleService_Integration_Update(t *testing.T) {

@@ -15,6 +15,7 @@ type Cache interface {
 	Get(ctx context.Context, key string, dest any) error
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
+	DeleteByPrefix(ctx context.Context, prefix string) error
 	Exists(ctx context.Context, key string) (bool, error)
 }
 
@@ -65,6 +66,32 @@ func (c *redisCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+func (c *redisCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	var cursor uint64
+	pattern := prefix + "*"
+
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = c.client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return fmt.Errorf("cache scan %q: %w", pattern, err)
+		}
+
+		if len(keys) > 0 {
+			if err := c.client.Del(ctx, keys...).Err(); err != nil {
+				return fmt.Errorf("cache delete by prefix %q: %w", pattern, err)
+			}
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return nil
+}
+
 func (c *redisCache) Exists(ctx context.Context, key string) (bool, error) {
 	n, err := c.client.Exists(ctx, key).Result()
 	if err != nil {
@@ -99,6 +126,10 @@ func (n *noopCache) Set(_ context.Context, _ string, _ any, _ time.Duration) err
 }
 
 func (n *noopCache) Delete(_ context.Context, _ string) error {
+	return nil
+}
+
+func (n *noopCache) DeleteByPrefix(_ context.Context, _ string) error {
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"service-app/internal/dto"
+	"service-app/internal/structs"
 )
 
 // MockUserService is a testify mock implementation of service.UserService.
@@ -13,12 +14,12 @@ type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) GetAll(ctx context.Context) ([]dto.UserResponse, error) {
-	args := m.Called(ctx)
+func (m *MockUserService) GetAll(ctx context.Context, params structs.ListParams) (*dto.PaginatedResponse, error) {
+	args := m.Called(ctx, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]dto.UserResponse), args.Error(1)
+	return args.Get(0).(*dto.PaginatedResponse), args.Error(1)
 }
 
 func (m *MockUserService) GetByID(ctx context.Context, id int64) (*dto.UserResponse, error) {

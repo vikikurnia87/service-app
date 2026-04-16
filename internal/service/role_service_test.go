@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io"
 	"log/slog"
 	"testing"
 
@@ -22,7 +23,7 @@ func newTestRoleService(t *testing.T) (RoleService, *mocks.MockRoleRepository, *
 	t.Helper()
 	mockRepo := new(mocks.MockRoleRepository)
 	mockCache := new(mocks.MockCache)
-	logger := slog.Default()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := NewRoleService(mockRepo, mockCache, logger)
 	return svc, mockRepo, mockCache
 }
